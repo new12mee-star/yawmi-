@@ -26,6 +26,20 @@ h2{font-size:1.05rem;margin:22px 0 8px;color:var(--mut);font-weight:600}
 .logo{flex:none;border-radius:10px}
 label.d{display:grid;place-items:center;cursor:pointer;font-size:.72rem}
 label.d:has(input:checked){background:var(--acc);color:#12162b;font-weight:700}
+.bars{display:flex;gap:8px;align-items:flex-end;height:120px;margin:8px 0 14px}
+.bc{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px;font-size:.7rem;color:var(--mut)}
+.bc i{display:block;width:100%;background:linear-gradient(0deg,var(--acc),var(--ok));border-radius:6px 6px 0 0;min-height:2px}
+.grp{display:block;width:100%;text-align:left;margin:8px 0 6px;background:var(--panel2)}
+input.srch{width:100%;margin-bottom:10px}
+textarea{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 11px;color:inherit;font:inherit;flex:1 1 100%}
+.subs{margin-top:6px;display:grid;gap:4px}
+.sub{font-size:.88rem;display:flex;gap:6px;align-items:center}
+.sub.done{color:var(--mut);text-decoration:line-through}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;text-align:center;color:var(--mut);font-size:.72rem}
+.cal i{display:block}
+.cd{padding:8px 0;border-radius:8px;background:var(--panel2);color:var(--tx);font-size:.8rem}
+.cd.on{background:var(--ok);color:#12162b;font-weight:700}
+.cd.now{outline:1px solid var(--acc)}
 .tm{font-size:.78rem;color:var(--mut);text-align:center;line-height:1.25;width:46px;flex:none}
 .cls{border-left:3px solid var(--acc)}
 .live{border-left-color:var(--ok)}
@@ -75,7 +89,7 @@ input[type=text]{flex:1 1 180px}
 .nav span{flex:1;text-align:center;color:var(--mut)}
 .empty{color:var(--mut);padding:14px;text-align:center;border:1px dashed var(--line);border-radius:var(--r)}
 nav.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--panel);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom));gap:4px}
-nav.tabs button{flex:1;background:none;font-size:.82rem;padding:10px 2px;color:var(--mut);border-radius:12px}
+nav.tabs button{flex:1;background:none;font-size:.74rem;padding:10px 1px;color:var(--mut);border-radius:12px}
 nav.tabs button.on{background:var(--panel2);color:var(--tx);font-weight:600}
 .tools{display:flex;gap:6px}
 .tools button{font-size:.8rem;padding:6px 10px}
@@ -98,7 +112,7 @@ nav.tabs button.on{background:var(--panel2);color:var(--tx);font-weight:600}
     <div class="tools">
       <button id="exp" title="Download a backup">Export</button>
       <button id="imp" title="Load a backup">Import</button>
-      <input id="file" type="file" accept=".json" hidden>
+      <input id="file" type="file" hidden>
     </div>
   </header>
   <div id="view"></div>
@@ -109,6 +123,7 @@ nav.tabs button.on{background:var(--panel2);color:var(--tx);font-weight:600}
   <button data-tab="habits">Habits</button>
   <button data-tab="week">Week</button>
   <button data-tab="sched">Schedule</button>
+  <button data-tab="stats">Stats</button>
 </nav>
 
 <div id="toast" hidden role="status" aria-live="polite"></div>
@@ -119,8 +134,8 @@ try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
 S=S||{tasks:[],habits:[],wk:1};
 S.born=S.born||Date.now();
 S.sched=S.sched||[];
-let tab='today', cat='All', off=0, editId=null, lastDel=null, tmr=null, hoff=0;
-const CATS=['Home','Health','Study','Money','Work','Other'];
+let tab='today', cat='All', off=0, editId=null, lastDel=null, tmr=null, hoff=0, qs='', cmo=0, csel='', fm={mins:25,end:0,left:1500};
+const CATS=['Home','Health','Study','Money','Work','Exam','Other'];
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
 if(!S.seeded){S.seeded=1;if(!S.sched.length)S.sched=[
 ['s1','Economie du Maroc','WASSINI ARRASEN',2,'08:30','10:45','4'],
@@ -131,6 +146,12 @@ if(!S.seeded){S.seeded=1;if(!S.sched.length)S.sched=[
 ['s6',"Droit de l'entreprise",'NOURI',6,'08:30','10:45','1B'],
 ['s7','Macroéconomie 2','MSADY ADIL',6,'11:00','13:15','5']
 ].map(([id,title,teacher,day,start,end,room])=>({id,title,teacher,day,start,end,room}));save()}
+function migrate(){let c=0;
+  S.habits.forEach(h=>{const n=h.name.trim().toLowerCase();
+    if(h.grp===undefined){h.grp=['sobh','dohr','aser','maghrib','ichae'].includes(n)?'Prayers':'';c++}
+    if(h.goal===undefined){h.goal=n==='2h working'?2:n==='10 pages of book'?10:0;h.unit=n==='2h working'?'h':n==='10 pages of book'?'pages':'';c++}});
+  if(c)save()}
+migrate();
 const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const today=()=>iso(new Date());
 const addDays=(s,n)=>{const d=new Date(s+'T12:00');d.setDate(d.getDate()+n);return iso(d)};
@@ -139,10 +160,11 @@ const uid=()=>Math.random().toString(36).slice(2,9);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const opts=(a,sel)=>a.map(x=>`<option${x===sel?' selected':''}>${x}</option>`).join('');
 
+const isDone=(h,d)=>{const v=h.log[d];return h.goal?v>=h.goal:!!v};
 const sched=(h,d)=>{const g=new Date(d+'T12:00').getDay(),f=h.freq||'daily';if(f.startsWith('D:'))return f.slice(2).split(',').includes(String(g));
   return f==='wkdays'?g>0&&g<6:f==='wkend'?g===0||g===6:true};
 const weekStart=d=>addDays(d,-((new Date(d+'T12:00').getDay()-S.wk+7)%7));
-const wcount=(h,ws)=>{let c=0;for(let i=0;i<7;i++)if(h.log[addDays(ws,i)])c++;return c};
+const wcount=(h,ws)=>{let c=0;for(let i=0;i<7;i++)if(isDone(h,addDays(ws,i)))c++;return c};
 const isWeekly=h=>(h.freq||'')[0]==='n';
 function streak(h){
   let k=0;
@@ -154,10 +176,10 @@ function streak(h){
     return {n:k,u:'week'};
   }
   let d=today();
-  if(sched(h,d)&&!h.log[d]) d=addDays(d,-1);
+  if(sched(h,d)&&!isDone(h,d)) d=addDays(d,-1);
   for(let i=0;i<4000;i++){
-    if(!sched(h,d)){if(h.log[d])k++;d=addDays(d,-1);continue}
-    if(h.log[d]){k++;d=addDays(d,-1)}else break;
+    if(!sched(h,d)){if(isDone(h,d))k++;d=addDays(d,-1);continue}
+    if(isDone(h,d)){k++;d=addDays(d,-1)}else break;
   }
   return {n:k,u:'day'};
 }
@@ -167,17 +189,17 @@ const freqLabel=h=>{const f=h.freq||'daily';
   const n=+f.slice(1);return n+'× per week • '+wcount(h,weekStart(today()))+'/'+n+' this week'};
 const freqOpts=()=>[['daily','Every day'],['wkdays','Mon–Fri'],['wkend','Weekends'],...[1,2,3,4,5,6].map(n=>['n'+n,n+'× / week'])].map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
 const dueToday=h=>{const f=h.freq||'daily',t=today();
-  if(f[0]==='n')return !!h.log[t]||wcount(h,weekStart(t))<+f.slice(1);
-  return sched(h,t)||!!h.log[t]};
+  if(f[0]==='n')return isDone(h,t)||wcount(h,weekStart(t))<+f.slice(1);
+  return sched(h,t)||isDone(h,t)};
 const repOpts=sel=>[['','No repeat'],['daily','Repeat daily'],['weekly','Repeat weekly'],['monthly','Repeat monthly']].map(([v,l])=>`<option value="${v}"${(sel||'')===v?' selected':''}>${l}</option>`).join('');
 const nextDate=(s,r)=>{if(r==='daily')return addDays(s,1);if(r==='weekly')return addDays(s,7);
   const d=new Date(s+'T12:00'),g=d.getDate();d.setMonth(d.getMonth()+1);if(d.getDate()!==g)d.setDate(0);return iso(d)};
 function toggleTask(t){
-  t.done=!t.done;
+  t.done=!t.done;t.doneAt=t.done?today():'';
   if(t.done&&t.rep&&!t.nx){
     let n=nextDate(t.date||today(),t.rep);
     while(n<=today())n=nextDate(n,t.rep);
-    const c={...t,id:uid(),date:n,done:false,nx:''};S.tasks.push(c);t.nx=c.id;
+    const c={...t,id:uid(),date:n,done:false,nx:'',subs:(t.subs||[]).map(x=>({t:x.t,d:false}))};S.tasks.push(c);t.nx=c.id;
   }else if(!t.done&&t.nx){S.tasks=S.tasks.filter(x=>x.id!==t.nx||x.done);t.nx=''}
 }
 function ok(m,w){if(!m)return;const e=$('#toast');e.innerHTML='<span>'+(w?'⚠ ':'✓ ')+esc(m)+'</span>';e.hidden=false;lastDel=null;clearTimeout(tmr);tmr=setTimeout(hideToast,2200)}
@@ -193,7 +215,7 @@ const editRow=t=>`<form class="edit" data-f="edit" data-id="${t.id}"><div class=
 <input type="date" name="date" value="${t.date||''}" aria-label="Due date">
 <select name="pri" aria-label="Priority">${[['high','High'],['med','Medium'],['low','Low']].map(([v,l])=>`<option value="${v}"${t.pri===v?' selected':''}>${l}</option>`).join('')}</select>
 <select name="cat" aria-label="Category">${opts(CATS,t.cat)}</select>
-<select name="rep" aria-label="Repeat">${repOpts(t.rep)}</select>
+<select name="rep" aria-label="Repeat">${repOpts(t.rep)}</select><textarea name="subs" rows="3" placeholder="Steps, one per line" aria-label="Steps">${esc((t.subs||[]).map(x=>x.t).join('\n'))}</textarea>
 <button class="pri">Save</button><button type="button" data-a="ec">Cancel</button></div></form>`;
 const DN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const dorder=()=>[0,1,2,3,4,5,6].map(i=>(S.wk+i)%7);
@@ -215,29 +237,87 @@ function vSched(){
     return l.length?`<h2>${DN[g]}</h2>`+l.map(c=>classRow(c,'',true)).join(''):''}).join('');
   return form+'<p class="meta">Weekly classes repeat automatically and appear in Today and Week.</p>'+(body||'<div class="empty">No classes yet. Add your timetable above.</div>');
 }
-function taskRow(t,showDate){
+function taskRow(t,showDate,mv){
   if(editId===t.id) return editRow(t);
   const t0=today(), late=!t.done&&t.date&&t.date<t0;
-  const meta=[t.cat, showDate&&t.date?fmt(t.date,{month:'short',day:'numeric'}):'',t.rep?'↻ '+t.rep:''].filter(Boolean).join(' • ');
+  const meta=[t.cat, showDate&&t.date?fmt(t.date,{month:'short',day:'numeric'}):'',t.rep?'↻ '+t.rep:'',t.cat==='Exam'&&t.date&&!t.done&&t.date>=today()?dleft(t.date):'',t.subs&&t.subs.length?t.subs.filter(x=>x.d).length+'/'+t.subs.length+' steps':''].filter(Boolean).join(' • ');
   return `<div class="row${t.done?' done':''}">
     <button class="chk" data-a="tt" data-id="${t.id}" aria-label="Toggle done">${t.done?'✓':''}</button>
     <span class="dot p-${t.pri}" title="${t.pri} priority"></span>
-    <div class="t">${esc(t.text)}<div class="meta${late?' over':''}">${esc(meta)}${late?' • overdue':''}</div>${late?'<button class="mini" data-a="mv" data-id="'+t.id+'" data-n="0">Move to today</button><button class="mini" data-a="mv" data-id="'+t.id+'" data-n="1">Tomorrow</button>':''}</div>
-    <button class="x" data-a="te" data-id="${t.id}" aria-label="Edit">Edit</button>
+    <div class="t">${esc(t.text)}<div class="meta${late?' over':''}">${esc(meta)}${late?' • overdue':''}</div>${late?'<button class="mini" data-a="mv" data-id="'+t.id+'" data-n="0">Move to today</button><button class="mini" data-a="mv" data-id="'+t.id+'" data-n="1">Tomorrow</button>':''}${subList(t)}</div>
+    ${mv&&!t.done?'<button class="x" data-a="nd" data-id="'+t.id+'" aria-label="Move to next day">→</button>':''}<button class="x" data-a="te" data-id="${t.id}" aria-label="Edit">Edit</button>
     <button class="x" data-a="td" data-id="${t.id}" aria-label="Delete">✕</button>
   </div>`;
 }
+const habEdit=h=>`<form class="edit" data-f="hedit" data-id="${h.id}"><div class="add"><input type="text" name="name" value="${esc(h.name)}" required maxlength="60" aria-label="Habit"><input type="number" name="goal" min="0" step="any" value="${h.goal||''}" placeholder="Daily goal" aria-label="Daily goal"><input type="text" name="unit" value="${esc(h.unit||'')}" placeholder="Unit" maxlength="12" aria-label="Unit"><input type="text" name="grp" value="${esc(h.grp||'')}" placeholder="Group" maxlength="20" aria-label="Group"><button class="pri">Save</button><button type="button" data-a="ec">Cancel</button></div></form>`;
+const habRow=(h,t0)=>{
+  const v=h.log[t0]||0,dn=isDone(h,t0),k=streak(h).n,fl=k?'<span class="streak">🔥 '+k+'</span>':'';
+  if(h.goal)return `<div class="row${dn?' done':''}"><div class="t">${esc(h.name)}<div class="meta">${v}/${h.goal} ${esc(h.unit||'')}</div><div class="bar" style="margin-top:6px"><i style="width:${Math.min(100,v/h.goal*100)}%"></i></div></div><button class="mini" style="margin:0" data-a="hs" data-id="${h.id}" data-n="-1" aria-label="Less">−</button><button class="mini" style="margin:0" data-a="hs" data-id="${h.id}" data-n="1" aria-label="More">+</button>${fl}</div>`;
+  return `<div class="row${dn?' done':''}"><button class="chk" data-a="ht" data-id="${h.id}" data-d="${t0}" aria-label="Toggle habit">${dn?'✓':''}</button><div class="t">${esc(h.name)}</div>${fl}</div>`;
+};
+function habSection(hb,t0){
+  if(!hb.length)return'<div class="empty">No habits due today. Add or manage them in Habits.</div>';
+  const gs=[...new Set(hb.map(h=>h.grp||''))].sort((a,b)=>(a?1:0)-(b?1:0));
+  return gs.map(g=>{const l=hb.filter(h=>(h.grp||'')===g);
+    if(!g)return l.map(h=>habRow(h,t0)).join('');
+    const col=(S.col||{})[g],dn=l.filter(h=>isDone(h,t0)).length;
+    return `<button class="chip grp" data-a="gt" data-g="${esc(g)}">${col?'▸':'▾'} ${esc(g)} <b>${dn}/${l.length}</b></button>`+(col?'':l.map(h=>habRow(h,t0)).join(''))}).join('')}
+const dleft=d=>{const n=Math.round((new Date(d+'T12:00')-new Date(today()+'T12:00'))/864e5);return n===0?'today':n===1?'tomorrow':n>1?'in '+n+' days':-n+' days ago'};
+const examBlock=t0=>{const l=S.tasks.filter(t=>t.cat==='Exam'&&!t.done&&t.date&&t.date>=t0).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);
+  return l.length?'<h2>Exams & deadlines</h2>'+l.map(t=>`<div class="row"><span class="dot p-high"></span><div class="t">${esc(t.text)}<div class="meta">${fmt(t.date,{weekday:'short',month:'short',day:'numeric'})} • ${dleft(t.date)}</div></div></div>`).join(''):''};
+const best=h=>{let b=0,c=0;for(let i=365;i>=0;i--){const d=addDays(today(),-i);if(!sched(h,d))continue;if(isDone(h,d)){c++;b=Math.max(b,c)}else c=0}return b};
+const subList=t=>t.subs&&t.subs.length?'<div class="subs">'+t.subs.map((x,i)=>`<label class="sub${x.d?' done':''}"><input type="checkbox" data-a="st" data-id="${t.id}" data-i="${i}"${x.d?' checked':''}> ${esc(x.t)}</label>`).join('')+'</div>':'';
+const fmtT=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+const focusLeft=()=>fm.end?Math.max(0,Math.round((fm.end-Date.now())/1000)):fm.left;
+function focusCard(){
+  const run=!!fm.end,mn=Math.floor((S.focus||{})[today()]||0);
+  const sel=`<select id="fh" aria-label="Log to habit"><option value="">Log time to a habit…</option>${S.habits.filter(h=>h.goal).map(h=>`<option value="${h.id}"${S.fh===h.id?' selected':''}>${esc(h.name)}</option>`).join('')}</select>`;
+  return `<h2>Focus timer</h2><div class="row"><div class="t"><b id="fv" style="font-size:1.6rem">${fmtT(focusLeft())}</b><div class="meta">${mn} min focused today</div>${sel}</div>`+
+   [25,45,5].map(m=>`<button class="mini" style="margin:0" data-a="fm" data-n="${m}"${run?' disabled':''}>${m}m</button>`).join('')+
+   `<button class="pri" data-a="fgo">${run?'Pause':'Start'}</button><button class="x" data-a="frs" aria-label="Reset">↺</button></div>`;
+}
+function beep(){try{const c=new (window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator();o.connect(c.destination);o.frequency.value=880;o.start();setTimeout(()=>{o.stop();c.close()},500)}catch(e){}try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}}
+function focusDone(){
+  const m=fm.mins;fm.end=0;fm.left=m*60;
+  if(m>=15){S.focus=S.focus||{};S.focus[today()]=(S.focus[today()]||0)+m;
+    const h=S.habits.find(x=>x.id===S.fh);
+    if(h&&h.goal){const u=(h.unit||'').toLowerCase(),t0=today();h.log[t0]=Math.round(((h.log[t0]||0)+(u.startsWith('h')?m/60:m))*100)/100}}
+  save();beep();ok(m>=15?'Focus session done – '+m+' min':'Break is over');render();
+}
+setInterval(()=>{if(!fm.end)return;const l=focusLeft(),e=$('#fv');if(e)e.textContent=fmtT(l);if(l<=0)focusDone()},1000);
+function calHtml(){
+  if(!S.habits.length)return'';
+  const h=S.habits.find(x=>x.id===csel)||S.habits[0];csel=h.id;
+  const base=new Date();base.setDate(1);base.setMonth(base.getMonth()+cmo);
+  const y=base.getFullYear(),m=base.getMonth(),dim=new Date(y,m+1,0).getDate(),lead=(new Date(y,m,1).getDay()-S.wk+7)%7;
+  let cells=dorder().map(g=>`<span>${DN[g][0]}</span>`).join('')+'<i></i>'.repeat(lead);
+  for(let d=1;d<=dim;d++){const ds=iso(new Date(y,m,d));cells+=`<button class="cd${isDone(h,ds)?' on':''}${ds===today()?' now':''}" data-a="ht" data-id="${h.id}" data-d="${ds}">${d}</button>`}
+  return `<h2>Calendar</h2><div class="nav"><button data-a="cm" data-n="-1" aria-label="Previous month">‹</button><span>${base.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</span><button data-a="cm" data-n="1" aria-label="Next month">›</button></div><select id="ch" aria-label="Habit" style="margin-bottom:8px;width:100%">${S.habits.map(x=>`<option value="${x.id}"${x.id===h.id?' selected':''}>${esc(x.name)}</option>`).join('')}</select><div class="cal">${cells}</div>`;
+}
+function vStats(){
+  $('#title').textContent='Stats';
+  const t=today(),ds=[6,5,4,3,2,1,0].map(n=>addDays(t,-n));
+  const bars=ds.map(d=>{const due=S.habits.filter(h=>!isWeekly(h)&&sched(h,d)),dn=due.filter(h=>isDone(h,d)).length,p=due.length?Math.round(dn/due.length*100):0;
+    return `<div class="bc"><small>${p}%</small><i style="height:${p*.8}px"></i><span>${fmt(d,{weekday:'narrow'})}</span></div>`}).join('');
+  const wk=S.tasks.filter(x=>x.done&&x.doneAt&&x.doneAt>=ds[0]).length;
+  const rows=S.habits.map(h=>{const s=streak(h);return `<div class="row"><div class="t">${esc(h.name)}<div class="meta">${s.n?'🔥 '+s.n+' '+s.u+(s.n>1?'s':''):'no streak'} • best ${isWeekly(h)?'–':best(h)+' days'}${rate(h)}</div></div></div>`}).join('');
+  return `<h2>Habits completed – last 7 days</h2><div class="bars">${bars}</div>
+  <div class="row"><div class="t">Tasks<div class="meta">${wk} completed this week • ${S.tasks.filter(x=>!x.done).length} still open</div></div></div>
+  <div class="row"><div class="t">Focus<div class="meta">${Math.round(Object.entries(S.focus||{}).filter(e=>e[0]>=ds[0]).reduce((a,e)=>a+e[1],0))} min in the last 7 days</div></div></div>
+  ${calHtml()}<h2>Per habit</h2>`+(rows||'<div class="empty">No habits yet.</div>');
+}
 function habitRow(h,days){
+  if(editId===h.id)return habEdit(h);
   const t0=today();
-  const dots=days.map(d=>`<button class="d${h.log[d]?' on':''}${d===t0?' now':''}" data-a="ht" data-id="${h.id}" data-d="${d}" aria-label="${fmt(d,{weekday:'long'})}">${fmt(d,{weekday:'narrow'})}</button>`).join('');
+  const dots=days.map(d=>`<button class="d${isDone(h,d)?' on':''}${d===t0?' now':''}" data-a="ht" data-id="${h.id}" data-d="${d}" aria-label="${fmt(d,{weekday:'long'})}">${fmt(d,{weekday:'narrow'})}</button>`).join('');
   const s=streak(h);
   return `<div class="row">
-    <div class="t">${esc(h.name)}<div class="meta">${freqLabel(h)}${rate(h)}</div><div class="streak">${sk(s)}</div></div>
+    <div class="t">${esc(h.name)}<div class="meta">${freqLabel(h)}${h.goal?' • goal '+h.goal+' '+esc(h.unit||''):''}${h.grp?' • '+esc(h.grp):''}${rate(h)}</div><div class="streak">${sk(s)}</div></div>
     <div class="days">${dots}</div>
-    <button class="x" data-a="hd" data-id="${h.id}" aria-label="Delete habit">✕</button>
+    <button class="x" data-a="he" data-id="${h.id}">Edit</button><button class="x" data-a="hd" data-id="${h.id}" aria-label="Delete habit">✕</button>
   </div>`;
 }
-const rate=h=>{if(isWeekly(h))return'';let a=0,b=0;for(let i=0;i<30;i++){const d=addDays(today(),-i);if(sched(h,d)){a++;if(h.log[d])b++}}return a?' • 30 days: '+Math.round(b/a*100)+'%':''};
+const rate=h=>{if(isWeekly(h))return'';let a=0,b=0;for(let i=0;i<30;i++){const d=addDays(today(),-i);if(sched(h,d)){a++;if(isDone(h,d))b++}}return a?' • 30 days: '+Math.round(b/a*100)+'%':''};
 const last7=()=>{const t=addDays(today(),-7*hoff);return[6,5,4,3,2,1,0].map(n=>addDays(t,-n))};
 const addTaskForm=(d)=>`<form class="add" data-f="task">
   <input type="text" name="text" placeholder="New task" required maxlength="140" aria-label="Task">
@@ -250,32 +330,32 @@ const addTaskForm=(d)=>`<form class="add" data-f="task">
 function vToday(){
   const t0=today();
   const list=S.tasks.filter(t=>t.date===t0||(!t.done&&t.date&&t.date<t0));
-  const hb=S.habits.filter(dueToday), dt=list.filter(t=>t.done).length, dh=hb.filter(h=>h.log[t0]).length;
+  const hb=S.habits.filter(dueToday), dt=list.filter(t=>t.done).length, dh=hb.filter(h=>isDone(h,t0)).length;
   const total=list.length+hb.length, done=dt+dh, pct=total?Math.round(done/total*100):0;
   $('#title').textContent=fmt(t0,{weekday:'long',month:'long',day:'numeric'});
   return banner()+`<p class="sub">${total?`${done} of ${total} done`:'Nothing planned yet'}</p>
   <div class="big"><b>${pct}%</b><span class="meta">${dt}/${list.length} tasks • ${dh}/${hb.length} habits</span></div>
   <div class="bar"><i style="width:${pct}%"></i></div>
   ${classesOn(t0).length?'<h2>Classes today</h2>'+classesOn(t0).map(c=>classRow(c,t0)).join(''):''}
-  <h2>Tasks for today</h2>
+  ${examBlock(t0)}<h2>Tasks for today</h2>
   ${list.length?list.sort((a,b)=>a.done-b.done).map(t=>taskRow(t,false)).join(''):'<div class="empty">No tasks due today. Add one in Tasks or Week.</div>'}
   <h2>Habits</h2>
-  ${hb.length?hb.map(h=>`<div class="row${h.log[t0]?' done':''}">
-    <button class="chk" data-a="ht" data-id="${h.id}" data-d="${t0}" aria-label="Toggle habit">${h.log[t0]?'✓':''}</button>
-    <div class="t">${esc(h.name)}</div><span class="streak">${streak(h).n?'🔥 '+streak(h).n:''}</span></div>`).join(''):'<div class="empty">No habits due today. Add or manage them in Habits.</div>'}`;
+  ${habSection(hb,t0)}${focusCard()}`;
+}
+function taskList(){
+  const k=qs.trim().toLowerCase();
+  const l=S.tasks.filter(t=>(cat==='All'||t.cat===cat)&&(!k||(t.text+' '+(t.cat||'')+' '+(t.subs||[]).map(x=>x.t).join(' ')).toLowerCase().includes(k))).sort((a,b)=>a.done-b.done||(a.date||'9').localeCompare(b.date||'9'));
+  return l.length?l.map(t=>taskRow(t,true)).join(''):'<div class="empty">'+(k?'No matching tasks.':'No tasks here yet.')+'</div>';
 }
 function vTasks(){
   $('#title').textContent='Tasks';
   const all=['All',...CATS];
   const chips=all.map(c=>`<button class="chip${c===cat?' on':''}" data-a="cat" data-c="${c}">${c}</button>`).join('');
-  const list=S.tasks.filter(t=>cat==='All'||t.cat===cat)
-    .sort((a,b)=>a.done-b.done||(a.date||'9').localeCompare(b.date||'9'));
-  return addTaskForm(today())+`<div class="chips">${chips}</div>`+
-    (list.length?list.map(t=>taskRow(t,true)).join(''):'<div class="empty">No tasks here yet.</div>');
+  return addTaskForm(today())+`<input type="search" id="q" class="srch" placeholder="Search tasks" value="${esc(qs)}" aria-label="Search tasks"><div class="chips">${chips}</div><div id="tl">${taskList()}</div>`;
 }
 function vHabits(){
   $('#title').textContent='Habits';
-  return `<form class="add" data-f="habit"><input type="text" name="name" placeholder="New habit, e.g. Read 20 minutes" required maxlength="60" aria-label="Habit"><select name="freq" aria-label="How often">${freqOpts()}</select><div class="days" role="group" aria-label="Or pick specific days">${dorder().map(g=>`<label class="d" title="${DN[g]}"><input type="checkbox" name="dd" value="${g}" hidden>${DN[g][0]}</label>`).join('')}</div><button class="pri">Add habit</button></form>
+  return `<form class="add" data-f="habit"><input type="text" name="name" placeholder="New habit, e.g. Read 20 minutes" required maxlength="60" aria-label="Habit"><input type="number" name="goal" min="0" step="any" placeholder="Daily goal (optional)" aria-label="Daily goal"><input type="text" name="unit" placeholder="Unit (pages, h)" maxlength="12" aria-label="Unit"><input type="text" name="grp" placeholder="Group (optional)" maxlength="20" aria-label="Group"><select name="freq" aria-label="How often">${freqOpts()}</select><div class="days" role="group" aria-label="Or pick specific days">${dorder().map(g=>`<label class="d" title="${DN[g]}"><input type="checkbox" name="dd" value="${g}" hidden>${DN[g][0]}</label>`).join('')}</div><button class="pri">Add habit</button></form>
   <div class="nav"><button data-a="hh" data-n="1">‹ Earlier</button><span>${(()=>{const ds=last7();return fmt(ds[0],{month:'short',day:'numeric'})+' – '+fmt(ds[6],{month:'short',day:'numeric'})})()}</span><button data-a="hh" data-n="-1">Later ›</button></div>
   <p class="meta">Tap a day to mark it done. Optionally pick specific days (the circles) instead of the dropdown.</p>`+
   (S.habits.length?S.habits.map(h=>habitRow(h,last7())).join(''):'<div class="empty">Add your first habit above.</div>');
@@ -288,17 +368,17 @@ function vWeek(){
   const cols=days.map(d=>{
     const l=S.tasks.filter(t=>t.date===d);
     return `<div class="day${d===t0?' today':''}"><h3><span>${fmt(d,{weekday:'long'})}</span><span class="meta">${fmt(d,{month:'short',day:'numeric'})}</span></h3>
-    ${classesOn(d).map(c=>classRow(c,d)).join('')}${l.map(t=>taskRow(t,false)).join('')}
+    ${classesOn(d).map(c=>classRow(c,d)).join('')}${l.map(t=>taskRow(t,false,1)).join('')}
     <form data-f="quick" data-d="${d}"><input type="text" name="text" placeholder="Add to this day" maxlength="140" aria-label="Add task on ${fmt(d,{weekday:'long'})}"><button aria-label="Add task">Add</button></form></div>`}).join('');
   return `<div class="nav"><button data-a="wk" data-n="-1">‹ Prev</button><span>${lab}</span><button data-a="wk" data-n="1">Next ›</button><button data-a="wk" data-n="0">This week</button>
   <select id="wks" aria-label="Week starts on"><option value="1"${S.wk==1?' selected':''}>Starts Mon</option><option value="6"${S.wk==6?' selected':''}>Starts Sat</option><option value="0"${S.wk==0?' selected':''}>Starts Sun</option></select></div>
   <div class="wk">${cols}</div>`;
 }
 function render(){
-  $('#view').innerHTML={today:vToday,tasks:vTasks,habits:vHabits,week:vWeek,sched:vSched}[tab]();
+  $('#view').innerHTML={today:vToday,tasks:vTasks,habits:vHabits,week:vWeek,sched:vSched,stats:vStats}[tab]();
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
   document.querySelectorAll('form').forEach(f=>f.noValidate=true);
-  const ef=document.querySelector('.edit input[name=text],.edit input[name=title]');if(ef)ef.focus();
+  const ef=document.querySelector('.edit input[name=text],.edit input[name=title],.edit input[name=name]');if(ef)ef.focus();
   const w=$('#wks'); if(w) w.onchange=()=>{S.wk=+w.value;save();render()};
 }
 document.addEventListener('click',e=>{
@@ -315,24 +395,38 @@ document.addEventListener('click',e=>{
   else if(a==='dis') S.lx=Date.now();
   else if(a==='cd'){const c=S.sched.find(x=>x.id===id);if(c){const i=S.sched.indexOf(c);S.sched.splice(i,1);note('Class deleted',{k:'sched',i,v:c})}}
   else if(a==='undo'&&lastDel){S[lastDel.k].splice(lastDel.i,0,lastDel.v);lastDel=null;hideToast()}
-  else if(a==='ht'&&h){const d=b.dataset.d; h.log[d]?delete h.log[d]:h.log[d]=1;if(h.log[d])ok('Habit logged')}
+  else if(a==='ht'&&h){const d=b.dataset.d;
+    if(h.goal){const v=prompt('Amount on '+fmt(d,{month:'short',day:'numeric'})+(h.unit?' ('+h.unit+')':'')+' – goal '+h.goal,h.log[d]||'');if(v!==null){const n=parseFloat(v);n>0?h.log[d]=n:delete h.log[d];if(isDone(h,d))ok('Goal reached')}}
+    else{h.log[d]?delete h.log[d]:h.log[d]=1;if(h.log[d])ok('Habit logged')}}
+  else if(a==='hs'&&h){const d=today(),st=h.goal<=3?.5:h.goal<=12?1:5,was=isDone(h,d),n=Math.max(0,Math.round(((h.log[d]||0)+(+b.dataset.n)*st)*100)/100);n?h.log[d]=n:delete h.log[d];if(!was&&isDone(h,d))ok('Goal reached')}
+  else if(a==='he'&&h) editId=id;
+  else if(a==='gt'){S.col=S.col||{};S.col[b.dataset.g]=!S.col[b.dataset.g]}
+  else if(a==='st'&&t){const x=(t.subs||[])[+b.dataset.i];if(x)x.d=!x.d}
+  else if(a==='nd'&&t) t.date=addDays(t.date||today(),1);
+  else if(a==='cm') cmo+=+b.dataset.n;
+  else if(a==='fm'&&!fm.end){fm.mins=+b.dataset.n;fm.left=fm.mins*60}
+  else if(a==='fgo'){if(fm.end){fm.left=focusLeft();fm.end=0}else fm.end=Date.now()+fm.left*1000}
+  else if(a==='frs'){fm.end=0;fm.left=fm.mins*60}
   else if(a==='hd'&&h){const i=S.habits.indexOf(h);S.habits.splice(i,1);note('Habit deleted',{k:'habits',i,v:h})}
   else if(a==='cat') cat=b.dataset.c;
   else if(a==='wk'){const n=+b.dataset.n; off=n===0?0:off+n}
   save();render();
 });
+document.addEventListener('input',e=>{if(e.target.id==='q'){qs=e.target.value;$('#tl').innerHTML=taskList()}});
+document.addEventListener('change',e=>{if(e.target.id==='fh'){S.fh=e.target.value;save()}else if(e.target.id==='ch'){csel=e.target.value;render()}});
 document.addEventListener('submit',e=>{
   e.preventDefault();
   const f=e.target, k=f.dataset.f, v=Object.fromEntries(new FormData(f));
   if(!f.checkValidity()){const bad=[...f.elements].find(x=>x.checkValidity&&!x.checkValidity());ok((bad.getAttribute('aria-label')||'A field')+' is required',1);bad.focus();return}
   if(k!=='quick'&&!(v.text??v.title??v.name??'x').trim()){ok('Please type a name first',1);f.querySelector('input[type=text]').focus();return}
-  if(k==='task'&&cat!=='All'&&cat!==v.cat)cat='All';
+  if(k==='task'){qs='';if(cat!=='All'&&cat!==v.cat)cat='All'}
   if(k==='task') S.tasks.push({id:uid(),text:v.text.trim(),date:v.date||'',pri:v.pri,cat:v.cat,rep:v.rep||'',done:false});
   else if(k==='quick'){if(!v.text.trim()){ok('Type a task first',1);return} S.tasks.push({id:uid(),text:v.text.trim(),date:f.dataset.d,pri:'med',cat:'Other',done:false})}
   else if(k==='cls') S.sched.push({id:uid(),title:v.title.trim(),day:+v.day,start:v.start,end:v.end,room:(v.room||'').trim(),teacher:(v.teacher||'').trim()});
   else if(k==='cedit'){const c=S.sched.find(x=>x.id===f.dataset.id);if(c&&v.title.trim())Object.assign(c,{title:v.title.trim(),day:+v.day,start:v.start,end:v.end,room:(v.room||'').trim(),teacher:(v.teacher||'').trim()});editId=null}
-  else if(k==='edit'){const t=S.tasks.find(x=>x.id===f.dataset.id);if(t&&v.text.trim())Object.assign(t,{text:v.text.trim(),date:v.date||'',pri:v.pri,cat:v.cat,rep:v.rep||''});editId=null}
-  else if(k==='habit') S.habits.push({id:uid(),name:v.name.trim(),log:{},freq:(()=>{const dd=new FormData(f).getAll('dd');return dd.length?'D:'+dd.join(','):v.freq||'daily'})()});
+  else if(k==='edit'){const t=S.tasks.find(x=>x.id===f.dataset.id);if(t&&v.text.trim())Object.assign(t,{text:v.text.trim(),date:v.date||'',pri:v.pri,cat:v.cat,rep:v.rep||''});if(t){const o=t.subs||[];t.subs=(v.subs||'').split('\n').map(x=>x.trim()).filter(Boolean).map(x=>({t:x,d:o.some(q=>q.t===x&&q.d)}))}editId=null}
+  else if(k==='hedit'){const h=S.habits.find(x=>x.id===f.dataset.id);if(h&&v.name.trim())Object.assign(h,{name:v.name.trim(),goal:+v.goal||0,unit:(v.unit||'').trim(),grp:(v.grp||'').trim()});editId=null}
+  else if(k==='habit') S.habits.push({id:uid(),name:v.name.trim(),log:{},goal:+v.goal||0,unit:(v.unit||'').trim(),grp:(v.grp||'').trim(),freq:(()=>{const dd=new FormData(f).getAll('dd');return dd.length?'D:'+dd.join(','):v.freq||'daily'})()});
   save();render();ok({task:'Task added',quick:'Task added',habit:'Habit added',cls:'Class added',edit:'Task saved',cedit:'Class saved'}[k]);
   const q=document.querySelector('form[data-f=task] input[name=text],form[data-f=habit] input[name=name],form[data-f=cls] input[name=title]'); if(q) q.focus();
 });
@@ -352,7 +446,7 @@ $('#file').onchange=e=>{
       const mg=(a,b)=>{const ids=new Set(a.map(x=>x.id));(b||[]).forEach(x=>{if(!ids.has(x.id))a.push(x)})};
       mg(S.tasks,d.tasks);mg(S.sched,d.sched);
       d.habits.forEach(h=>{const e=S.habits.find(x=>x.id===h.id);e?Object.assign(e.log,h.log):S.habits.push(h)});
-      save();render();ok('Backup merged')}
+      migrate();save();render();ok('Backup merged')}
   }catch(x){alert('This file is not a valid Yawmi backup.')}};
   r.readAsText(f); e.target.value='';
 };
