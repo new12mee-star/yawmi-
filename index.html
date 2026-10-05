@@ -40,6 +40,23 @@ textarea{background:var(--panel);border:1px solid var(--line);border-radius:10px
 .cd{padding:8px 0;border-radius:8px;background:var(--panel2);color:var(--tx);font-size:.8rem}
 .cd.on{background:var(--ok);color:#12162b;font-weight:700}
 .cd.now{outline:1px solid var(--acc)}
+.cg{display:grid;grid-template-columns:38px repeat(var(--n),minmax(0,1fr));gap:0 2px;font-size:.7rem}
+.ch{text-align:center;padding:4px 0;color:var(--mut)}
+.ch b{display:block;font-size:1.05rem;color:var(--tx)}
+.ch.now b{color:var(--acc)}
+.ca0{color:var(--mut);padding:4px 0;font-size:.62rem}
+.ca{display:flex;flex-direction:column;gap:2px;padding-bottom:6px;min-width:0}
+.ca span{background:var(--panel2);border-radius:5px;padding:2px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hr{position:relative;color:var(--mut)}
+.hr span{position:absolute;right:4px;transform:translateY(-6px);font-size:.62rem}
+.cc{position:relative;background-image:linear-gradient(var(--line) 1px,transparent 1px);border-left:1px solid var(--line);overflow:hidden}
+.ev{position:absolute;border-radius:6px;padding:2px 4px;color:#12162b;overflow:hidden;line-height:1.2}
+.ev b{display:block;font-size:.72rem}
+.ev small{opacity:.8}
+.ev.dn{opacity:.45;text-decoration:line-through}
+.ev[data-a]{cursor:pointer}
+.nl{position:absolute;left:0;right:0;height:2px;background:var(--hi);z-index:2}
+nav.tabs::-webkit-scrollbar{display:none}
 .tm{font-size:.78rem;color:var(--mut);text-align:center;line-height:1.25;width:46px;flex:none}
 .cls{border-left:3px solid var(--acc)}
 .live{border-left-color:var(--ok)}
@@ -88,8 +105,8 @@ input[type=text]{flex:1 1 180px}
 .nav{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
 .nav span{flex:1;text-align:center;color:var(--mut)}
 .empty{color:var(--mut);padding:14px;text-align:center;border:1px dashed var(--line);border-radius:var(--r)}
-nav.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--panel);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom));gap:4px}
-nav.tabs button{flex:1;background:none;font-size:.74rem;padding:10px 1px;color:var(--mut);border-radius:12px}
+nav.tabs{overflow-x:auto;scrollbar-width:none;position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--panel);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom));gap:4px}
+nav.tabs button{flex:1 0 auto;background:none;font-size:.78rem;padding:10px 11px;color:var(--mut);border-radius:12px}
 nav.tabs button.on{background:var(--panel2);color:var(--tx);font-weight:600}
 .tools{display:flex;gap:6px}
 .tools button{font-size:.8rem;padding:6px 10px}
@@ -119,6 +136,7 @@ nav.tabs button.on{background:var(--panel2);color:var(--tx);font-weight:600}
 </div>
 <nav class="tabs" id="tabs">
   <button data-tab="today">Today</button>
+  <button data-tab="cal">Calendar</button>
   <button data-tab="tasks">Tasks</button>
   <button data-tab="habits">Habits</button>
   <button data-tab="week">Week</button>
@@ -134,7 +152,7 @@ try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
 S=S||{tasks:[],habits:[],wk:1};
 S.born=S.born||Date.now();
 S.sched=S.sched||[];
-let tab='today', cat='All', off=0, editId=null, lastDel=null, tmr=null, hoff=0, qs='', cmo=0, csel='', fm={mins:25,end:0,left:1500};
+let tab='today', cat='All', off=0, editId=null, lastDel=null, tmr=null, hoff=0, qs='', cmo=0, csel='', fm={mins:25,end:0,left:1500}, cv=innerWidth>=700?'week':'day', cday='';
 const CATS=['Home','Health','Study','Money','Work','Exam','Other'];
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
 if(!S.seeded){S.seeded=1;if(!S.sched.length)S.sched=[
@@ -212,7 +230,7 @@ function banner(){
 }
 const editRow=t=>`<form class="edit" data-f="edit" data-id="${t.id}"><div class="add">
 <input type="text" name="text" value="${esc(t.text)}" required maxlength="140" aria-label="Task">
-<input type="date" name="date" value="${t.date||''}" aria-label="Due date">
+<input type="date" name="date" value="${t.date||''}" aria-label="Due date"><input type="time" name="ts" value="${t.ts||''}" aria-label="Start time"><input type="time" name="te" value="${t.te||''}" aria-label="End time">
 <select name="pri" aria-label="Priority">${[['high','High'],['med','Medium'],['low','Low']].map(([v,l])=>`<option value="${v}"${t.pri===v?' selected':''}>${l}</option>`).join('')}</select>
 <select name="cat" aria-label="Category">${opts(CATS,t.cat)}</select>
 <select name="rep" aria-label="Repeat">${repOpts(t.rep)}</select><textarea name="subs" rows="3" placeholder="Steps, one per line" aria-label="Steps">${esc((t.subs||[]).map(x=>x.t).join('\n'))}</textarea>
@@ -240,7 +258,7 @@ function vSched(){
 function taskRow(t,showDate,mv){
   if(editId===t.id) return editRow(t);
   const t0=today(), late=!t.done&&t.date&&t.date<t0;
-  const meta=[t.cat, showDate&&t.date?fmt(t.date,{month:'short',day:'numeric'}):'',t.rep?'↻ '+t.rep:'',t.cat==='Exam'&&t.date&&!t.done&&t.date>=today()?dleft(t.date):'',t.subs&&t.subs.length?t.subs.filter(x=>x.d).length+'/'+t.subs.length+' steps':''].filter(Boolean).join(' • ');
+  const meta=[t.ts?t.ts+(t.te?'–'+t.te:''):'',t.cat, showDate&&t.date?fmt(t.date,{month:'short',day:'numeric'}):'',t.rep?'↻ '+t.rep:'',t.cat==='Exam'&&t.date&&!t.done&&t.date>=today()?dleft(t.date):'',t.subs&&t.subs.length?t.subs.filter(x=>x.d).length+'/'+t.subs.length+' steps':''].filter(Boolean).join(' • ');
   return `<div class="row${t.done?' done':''}">
     <button class="chk" data-a="tt" data-id="${t.id}" aria-label="Toggle done">${t.done?'✓':''}</button>
     <span class="dot p-${t.pri}" title="${t.pri} priority"></span>
@@ -294,6 +312,35 @@ function calHtml(){
   for(let d=1;d<=dim;d++){const ds=iso(new Date(y,m,d));cells+=`<button class="cd${isDone(h,ds)?' on':''}${ds===today()?' now':''}" data-a="ht" data-id="${h.id}" data-d="${ds}">${d}</button>`}
   return `<h2>Calendar</h2><div class="nav"><button data-a="cm" data-n="-1" aria-label="Previous month">‹</button><span>${base.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</span><button data-a="cm" data-n="1" aria-label="Next month">›</button></div><select id="ch" aria-label="Habit" style="margin-bottom:8px;width:100%">${S.habits.map(x=>`<option value="${x.id}"${x.id===h.id?' selected':''}>${esc(x.name)}</option>`).join('')}</select><div class="cal">${cells}</div>`;
 }
+const toM=x=>+x.slice(0,2)*60+ +x.slice(3,5);
+const CC={Exam:'#ff8a9b',Health:'#7fd8b4',Study:'#7fc4ff',Money:'#ffc977',Work:'#c3a6ff',Home:'#f6a05c',Other:'#b8bdd9'};
+function dayEv(d){
+  const ev=classesOn(d).map(c=>({s:toM(c.start),e:toM(c.end),t:c.title,m:c.room||'',c:'#8fa3ff'}));
+  S.tasks.filter(t=>t.date===d&&t.ts).forEach(t=>{const s=toM(t.ts);let e=t.te?toM(t.te):s+60;if(e<=s)e=s+60;ev.push({s,e,t:t.text,m:t.ts+(t.te?'–'+t.te:''),c:CC[t.cat]||CC.Other,id:t.id,done:t.done})});
+  return ev;
+}
+function layout(ev){
+  ev.sort((a,b)=>a.s-b.s||b.e-a.e);let cl=[],ce=0;const out=[];
+  const flush=()=>{const ln=[];cl.forEach(x=>{let i=ln.findIndex(le=>le<=x.s);if(i<0){i=ln.length;ln.push(0)}ln[i]=x.e;x.lane=i});cl.forEach(x=>x.n=ln.length);out.push(...cl);cl=[]};
+  ev.forEach(x=>{if(cl.length&&x.s>=ce)flush();ce=cl.length?Math.max(ce,x.e):x.e;cl.push(x)});flush();return out;
+}
+function vCal(){
+  $('#title').textContent='Calendar';
+  const base=cday||today(),t0=today(),wk=cv==='week';
+  const st=wk?addDays(base,-((new Date(base+'T12:00').getDay()-S.wk+7)%7)):base;
+  const days=wk?[0,1,2,3,4,5,6].map(i=>addDays(st,i)):[base];
+  const evs=days.map(d=>layout(dayEv(d))),all=evs.flat();
+  const h0=Math.min(7,all.length?Math.floor(Math.min(...all.map(x=>x.s))/60):7),h1=Math.max(20,all.length?Math.ceil(Math.max(...all.map(x=>x.e))/60):20),HP=wk?44:52,H=(h1-h0)*HP;
+  const hrs=Array.from({length:h1-h0},(_,i)=>`<span style="top:${i*HP}px">${String(h0+i).padStart(2,'0')}:00</span>`).join('');
+  const head=days.map(d=>`<div class="ch${d===t0?' now':''}">${fmt(d,{weekday:wk?'short':'long'})}<b>${fmt(d,{day:'numeric'})}</b></div>`).join('');
+  const allday=days.map(d=>`<div class="ca">${S.tasks.filter(t=>t.date===d&&!t.ts&&!t.done).map(t=>`<span>${esc(t.text)}</span>`).join('')}</div>`).join('');
+  const nm=toM(nowHM());
+  const cols=days.map((d,i)=>`<div class="cc" style="height:${H}px;background-size:100% ${HP}px">${evs[i].map(x=>`<div class="ev${x.done?' dn':''}"${x.id?` data-a="tt" data-id="${x.id}"`:''} style="top:${(x.s-h0*60)/60*HP}px;height:${Math.max(18,(x.e-x.s)/60*HP-2)}px;left:${x.lane/x.n*100}%;width:calc(${100/x.n}% - 2px);background:${x.c}"><b>${esc(x.t)}</b>${wk?'':`<small>${esc(x.m)}</small>`}</div>`).join('')}${d===t0&&nm>=h0*60&&nm<h1*60?`<div class="nl" style="top:${(nm-h0*60)/60*HP}px"></div>`:''}</div>`).join('');
+  const lab=wk?fmt(days[0],{month:'short',day:'numeric'})+' – '+fmt(days[6],{month:'short',day:'numeric'}):fmt(base,{weekday:'long',month:'long',day:'numeric'});
+  return `<div class="nav"><button data-a="cnv" data-n="-1" aria-label="Previous">‹</button><span>${lab}</span><button data-a="cnv" data-n="1" aria-label="Next">›</button><button data-a="cto">Today</button><button class="chip${wk?'':' on'}" data-a="cvw" data-v="day">Day</button><button class="chip${wk?' on':''}" data-a="cvw" data-v="week">Week</button></div>
+  <div class="cg" style="--n:${days.length}"><div></div>${head}<div class="ca0">no time</div>${allday}<div class="hr" style="height:${H}px">${hrs}</div>${cols}</div>
+  <p class="meta">Classes and tasks with a start time appear here. Tap a task block to mark it done. Add a time when creating or editing a task.</p>`;
+}
 function vStats(){
   $('#title').textContent='Stats';
   const t=today(),ds=[6,5,4,3,2,1,0].map(n=>addDays(t,-n));
@@ -321,7 +368,7 @@ const rate=h=>{if(isWeekly(h))return'';let a=0,b=0;for(let i=0;i<30;i++){const d
 const last7=()=>{const t=addDays(today(),-7*hoff);return[6,5,4,3,2,1,0].map(n=>addDays(t,-n))};
 const addTaskForm=(d)=>`<form class="add" data-f="task">
   <input type="text" name="text" placeholder="New task" required maxlength="140" aria-label="Task">
-  <input type="date" name="date" value="${d||''}" aria-label="Due date">
+  <input type="date" name="date" value="${d||''}" aria-label="Due date"><input type="time" name="ts" aria-label="Start time"><input type="time" name="te" aria-label="End time">
   <select name="pri" aria-label="Priority"><option value="high">High</option><option value="med" selected>Medium</option><option value="low">Low</option></select>
   <select name="cat" aria-label="Category">${opts(CATS,'Other')}</select>
   <select name="rep" aria-label="Repeat">${repOpts('')}</select>
@@ -375,8 +422,9 @@ function vWeek(){
   <div class="wk">${cols}</div>`;
 }
 function render(){
-  $('#view').innerHTML={today:vToday,tasks:vTasks,habits:vHabits,week:vWeek,sched:vSched,stats:vStats}[tab]();
+  $('#view').innerHTML={cal:vCal,today:vToday,tasks:vTasks,habits:vHabits,week:vWeek,sched:vSched,stats:vStats}[tab]();
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  const ab=document.querySelector('#tabs .on');if(ab&&ab.scrollIntoView)ab.scrollIntoView({inline:'center',block:'nearest'});
   document.querySelectorAll('form').forEach(f=>f.noValidate=true);
   const ef=document.querySelector('.edit input[name=text],.edit input[name=title],.edit input[name=name]');if(ef)ef.focus();
   const w=$('#wks'); if(w) w.onchange=()=>{S.wk=+w.value;save();render()};
@@ -404,6 +452,9 @@ document.addEventListener('click',e=>{
   else if(a==='st'&&t){const x=(t.subs||[])[+b.dataset.i];if(x)x.d=!x.d}
   else if(a==='nd'&&t) t.date=addDays(t.date||today(),1);
   else if(a==='cm') cmo+=+b.dataset.n;
+  else if(a==='cvw') cv=b.dataset.v;
+  else if(a==='cnv') cday=addDays(cday||today(),(+b.dataset.n)*(cv==='week'?7:1));
+  else if(a==='cto') cday='';
   else if(a==='fm'&&!fm.end){fm.mins=+b.dataset.n;fm.left=fm.mins*60}
   else if(a==='fgo'){if(fm.end){fm.left=focusLeft();fm.end=0}else fm.end=Date.now()+fm.left*1000}
   else if(a==='frs'){fm.end=0;fm.left=fm.mins*60}
@@ -420,11 +471,11 @@ document.addEventListener('submit',e=>{
   if(!f.checkValidity()){const bad=[...f.elements].find(x=>x.checkValidity&&!x.checkValidity());ok((bad.getAttribute('aria-label')||'A field')+' is required',1);bad.focus();return}
   if(k!=='quick'&&!(v.text??v.title??v.name??'x').trim()){ok('Please type a name first',1);f.querySelector('input[type=text]').focus();return}
   if(k==='task'){qs='';if(cat!=='All'&&cat!==v.cat)cat='All'}
-  if(k==='task') S.tasks.push({id:uid(),text:v.text.trim(),date:v.date||'',pri:v.pri,cat:v.cat,rep:v.rep||'',done:false});
+  if(k==='task') S.tasks.push({id:uid(),text:v.text.trim(),date:v.date||'',pri:v.pri,cat:v.cat,rep:v.rep||'',ts:v.ts||'',te:v.te||'',done:false});
   else if(k==='quick'){if(!v.text.trim()){ok('Type a task first',1);return} S.tasks.push({id:uid(),text:v.text.trim(),date:f.dataset.d,pri:'med',cat:'Other',done:false})}
   else if(k==='cls') S.sched.push({id:uid(),title:v.title.trim(),day:+v.day,start:v.start,end:v.end,room:(v.room||'').trim(),teacher:(v.teacher||'').trim()});
   else if(k==='cedit'){const c=S.sched.find(x=>x.id===f.dataset.id);if(c&&v.title.trim())Object.assign(c,{title:v.title.trim(),day:+v.day,start:v.start,end:v.end,room:(v.room||'').trim(),teacher:(v.teacher||'').trim()});editId=null}
-  else if(k==='edit'){const t=S.tasks.find(x=>x.id===f.dataset.id);if(t&&v.text.trim())Object.assign(t,{text:v.text.trim(),date:v.date||'',pri:v.pri,cat:v.cat,rep:v.rep||''});if(t){const o=t.subs||[];t.subs=(v.subs||'').split('\n').map(x=>x.trim()).filter(Boolean).map(x=>({t:x,d:o.some(q=>q.t===x&&q.d)}))}editId=null}
+  else if(k==='edit'){const t=S.tasks.find(x=>x.id===f.dataset.id);if(t&&v.text.trim())Object.assign(t,{text:v.text.trim(),date:v.date||'',pri:v.pri,cat:v.cat,rep:v.rep||'',ts:v.ts||'',te:v.te||''});if(t){const o=t.subs||[];t.subs=(v.subs||'').split('\n').map(x=>x.trim()).filter(Boolean).map(x=>({t:x,d:o.some(q=>q.t===x&&q.d)}))}editId=null}
   else if(k==='hedit'){const h=S.habits.find(x=>x.id===f.dataset.id);if(h&&v.name.trim())Object.assign(h,{name:v.name.trim(),goal:+v.goal||0,unit:(v.unit||'').trim(),grp:(v.grp||'').trim()});editId=null}
   else if(k==='habit') S.habits.push({id:uid(),name:v.name.trim(),log:{},goal:+v.goal||0,unit:(v.unit||'').trim(),grp:(v.grp||'').trim(),freq:(()=>{const dd=new FormData(f).getAll('dd');return dd.length?'D:'+dd.join(','):v.freq||'daily'})()});
   save();render();ok({task:'Task added',quick:'Task added',habit:'Habit added',cls:'Class added',edit:'Task saved',cedit:'Class saved'}[k]);
