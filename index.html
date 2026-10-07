@@ -152,7 +152,7 @@ try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
 S=S||{tasks:[],habits:[],wk:1};
 S.born=S.born||Date.now();
 S.sched=S.sched||[];
-let tab='today', cat='All', off=0, editId=null, lastDel=null, tmr=null, hoff=0, qs='', cmo=0, csel='', fm={mins:25,end:0,left:1500}, cv=innerWidth>=700?'week':'day', cday='';
+let tab='today', cat='All', off=0, editId=null, lastDel=null, tmr=null, hoff=0, qs='', cmo=0, csel='', fm={mins:25,end:0,left:1500}, cv=innerWidth>=700?'week':'day', cday='', tday='';
 const CATS=['Home','Health','Study','Money','Work','Exam','Other'];
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
 if(!S.seeded){S.seeded=1;if(!S.sched.length)S.sched=[
@@ -206,7 +206,7 @@ const freqLabel=h=>{const f=h.freq||'daily';
   if(f==='daily')return'Every day';if(f.startsWith('D:'))return f.slice(2).split(',').map(g=>DN[g].slice(0,3)).join(', ');if(f==='wkdays')return'Mon–Fri';if(f==='wkend')return'Weekends';
   const n=+f.slice(1);return n+'× per week • '+wcount(h,weekStart(today()))+'/'+n+' this week'};
 const freqOpts=()=>[['daily','Every day'],['wkdays','Mon–Fri'],['wkend','Weekends'],...[1,2,3,4,5,6].map(n=>['n'+n,n+'× / week'])].map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
-const dueToday=h=>{const f=h.freq||'daily',t=today();
+const dueToday=(h,t)=>{const f=h.freq||'daily';t=t||today();
   if(f[0]==='n')return isDone(h,t)||wcount(h,weekStart(t))<+f.slice(1);
   return sched(h,t)||isDone(h,t)};
 const repOpts=sel=>[['','No repeat'],['daily','Repeat daily'],['weekly','Repeat weekly'],['monthly','Repeat monthly']].map(([v,l])=>`<option value="${v}"${(sel||'')===v?' selected':''}>${l}</option>`).join('');
@@ -270,11 +270,11 @@ function taskRow(t,showDate,mv){
 const habEdit=h=>`<form class="edit" data-f="hedit" data-id="${h.id}"><div class="add"><input type="text" name="name" value="${esc(h.name)}" required maxlength="60" aria-label="Habit"><input type="number" name="goal" min="0" step="any" value="${h.goal||''}" placeholder="Daily goal" aria-label="Daily goal"><input type="text" name="unit" value="${esc(h.unit||'')}" placeholder="Unit" maxlength="12" aria-label="Unit"><input type="text" name="grp" value="${esc(h.grp||'')}" placeholder="Group" maxlength="20" aria-label="Group"><button class="pri">Save</button><button type="button" data-a="ec">Cancel</button></div></form>`;
 const habRow=(h,t0)=>{
   const v=h.log[t0]||0,dn=isDone(h,t0),k=streak(h).n,fl=k?'<span class="streak">🔥 '+k+'</span>':'';
-  if(h.goal)return `<div class="row${dn?' done':''}"><div class="t">${esc(h.name)}<div class="meta">${v}/${h.goal} ${esc(h.unit||'')}</div><div class="bar" style="margin-top:6px"><i style="width:${Math.min(100,v/h.goal*100)}%"></i></div></div><button class="mini" style="margin:0" data-a="hs" data-id="${h.id}" data-n="-1" aria-label="Less">−</button><button class="mini" style="margin:0" data-a="hs" data-id="${h.id}" data-n="1" aria-label="More">+</button>${fl}</div>`;
+  if(h.goal)return `<div class="row${dn?' done':''}"><div class="t">${esc(h.name)}<div class="meta">${v}/${h.goal} ${esc(h.unit||'')}</div><div class="bar" style="margin-top:6px"><i style="width:${Math.min(100,v/h.goal*100)}%"></i></div></div><button class="mini" style="margin:0" data-a="hs" data-id="${h.id}" data-n="-1" data-d="${t0}" aria-label="Less">−</button><button class="mini" style="margin:0" data-a="hs" data-id="${h.id}" data-n="1" data-d="${t0}" aria-label="More">+</button>${fl}</div>`;
   return `<div class="row${dn?' done':''}"><button class="chk" data-a="ht" data-id="${h.id}" data-d="${t0}" aria-label="Toggle habit">${dn?'✓':''}</button><div class="t">${esc(h.name)}</div>${fl}</div>`;
 };
 function habSection(hb,t0){
-  if(!hb.length)return'<div class="empty">No habits due today. Add or manage them in Habits.</div>';
+  if(!hb.length)return'<div class="empty">No habits scheduled for this day. Add or manage them in Habits.</div>';
   const gs=[...new Set(hb.map(h=>h.grp||''))].sort((a,b)=>(a?1:0)-(b?1:0));
   return gs.map(g=>{const l=hb.filter(h=>(h.grp||'')===g);
     if(!g)return l.map(h=>habRow(h,t0)).join('');
@@ -374,20 +374,21 @@ const addTaskForm=(d)=>`<form class="add" data-f="task">
   <select name="rep" aria-label="Repeat">${repOpts('')}</select>
   <button class="pri">Add task</button></form>`;
 
+const dayNav=t0=>`<div class="nav"><button data-a="tn" data-n="-1" aria-label="Previous day">‹</button><input type="date" id="td" value="${t0}" aria-label="Go to date" style="flex:1"><button data-a="tn" data-n="1" aria-label="Next day">›</button>${t0===today()?'':'<button class="pri" data-a="tt0">Today</button>'}</div>`;
 function vToday(){
-  const t0=today();
-  const list=S.tasks.filter(t=>t.date===t0||(!t.done&&t.date&&t.date<t0));
-  const hb=S.habits.filter(dueToday), dt=list.filter(t=>t.done).length, dh=hb.filter(h=>isDone(h,t0)).length;
+  const t0=tday||today(),now=t0===today();
+  const list=S.tasks.filter(t=>t.date===t0||(now&&!t.done&&t.date&&t.date<t0));
+  const hb=S.habits.filter(h=>dueToday(h,t0)), dt=list.filter(t=>t.done).length, dh=hb.filter(h=>isDone(h,t0)).length;
   const total=list.length+hb.length, done=dt+dh, pct=total?Math.round(done/total*100):0;
   $('#title').textContent=fmt(t0,{weekday:'long',month:'long',day:'numeric'});
-  return banner()+`<p class="sub">${total?`${done} of ${total} done`:'Nothing planned yet'}</p>
+  return (now?banner():'')+dayNav(t0)+`<p class="sub">${total?`${done} of ${total} done`:'Nothing planned yet'}</p>
   <div class="big"><b>${pct}%</b><span class="meta">${dt}/${list.length} tasks • ${dh}/${hb.length} habits</span></div>
   <div class="bar"><i style="width:${pct}%"></i></div>
-  ${classesOn(t0).length?'<h2>Classes today</h2>'+classesOn(t0).map(c=>classRow(c,t0)).join(''):''}
-  ${examBlock(t0)}<h2>Tasks for today</h2>
-  ${list.length?list.sort((a,b)=>a.done-b.done).map(t=>taskRow(t,false)).join(''):'<div class="empty">No tasks due today. Add one in Tasks or Week.</div>'}
+  ${classesOn(t0).length?'<h2>'+(now?'Classes today':'Classes')+'</h2>'+classesOn(t0).map(c=>classRow(c,t0)).join(''):''}
+  ${examBlock(t0)}<h2>${now?'Tasks for today':'Tasks'}</h2>
+  ${list.length?list.sort((a,b)=>a.done-b.done).map(t=>taskRow(t,false)).join(''):'<div class="empty">No tasks '+(now?'due today':'on this day')+'. Add one in Tasks or Week.</div>'}
   <h2>Habits</h2>
-  ${habSection(hb,t0)}${focusCard()}`;
+  ${habSection(hb,t0)}${now?focusCard():''}`;
 }
 function taskList(){
   const k=qs.trim().toLowerCase();
@@ -430,7 +431,7 @@ function render(){
   const w=$('#wks'); if(w) w.onchange=()=>{S.wk=+w.value;save();render()};
 }
 document.addEventListener('click',e=>{
-  const tb=e.target.closest('[data-tab]'); if(tb){tab=tb.dataset.tab;render();return}
+  const tb=e.target.closest('[data-tab]'); if(tb){if(tb.dataset.tab==='today'&&tab==='today')tday='';tab=tb.dataset.tab;render();return}
   const b=e.target.closest('[data-a]'); if(!b) return;
   const a=b.dataset.a, id=b.dataset.id, t=S.tasks.find(x=>x.id===id), h=S.habits.find(x=>x.id===id);
   if(a==='tt'&&t){toggleTask(t);if(t.done)ok(t.nx?'Done – next one scheduled':'Task completed')}
@@ -446,7 +447,7 @@ document.addEventListener('click',e=>{
   else if(a==='ht'&&h){const d=b.dataset.d;
     if(h.goal){const v=prompt('Amount on '+fmt(d,{month:'short',day:'numeric'})+(h.unit?' ('+h.unit+')':'')+' – goal '+h.goal,h.log[d]||'');if(v!==null){const n=parseFloat(v);n>0?h.log[d]=n:delete h.log[d];if(isDone(h,d))ok('Goal reached')}}
     else{h.log[d]?delete h.log[d]:h.log[d]=1;if(h.log[d])ok('Habit logged')}}
-  else if(a==='hs'&&h){const d=today(),st=h.goal<=3?.5:h.goal<=12?1:5,was=isDone(h,d),n=Math.max(0,Math.round(((h.log[d]||0)+(+b.dataset.n)*st)*100)/100);n?h.log[d]=n:delete h.log[d];if(!was&&isDone(h,d))ok('Goal reached')}
+  else if(a==='hs'&&h){const d=b.dataset.d||today(),st=h.goal<=3?.5:h.goal<=12?1:5,was=isDone(h,d),n=Math.max(0,Math.round(((h.log[d]||0)+(+b.dataset.n)*st)*100)/100);n?h.log[d]=n:delete h.log[d];if(!was&&isDone(h,d))ok('Goal reached')}
   else if(a==='he'&&h) editId=id;
   else if(a==='gt'){S.col=S.col||{};S.col[b.dataset.g]=!S.col[b.dataset.g]}
   else if(a==='st'&&t){const x=(t.subs||[])[+b.dataset.i];if(x)x.d=!x.d}
@@ -455,6 +456,8 @@ document.addEventListener('click',e=>{
   else if(a==='cvw') cv=b.dataset.v;
   else if(a==='cnv') cday=addDays(cday||today(),(+b.dataset.n)*(cv==='week'?7:1));
   else if(a==='cto') cday='';
+  else if(a==='tn') tday=addDays(tday||today(),+b.dataset.n);
+  else if(a==='tt0') tday='';
   else if(a==='fm'&&!fm.end){fm.mins=+b.dataset.n;fm.left=fm.mins*60}
   else if(a==='fgo'){if(fm.end){fm.left=focusLeft();fm.end=0}else fm.end=Date.now()+fm.left*1000}
   else if(a==='frs'){fm.end=0;fm.left=fm.mins*60}
@@ -464,7 +467,7 @@ document.addEventListener('click',e=>{
   save();render();
 });
 document.addEventListener('input',e=>{if(e.target.id==='q'){qs=e.target.value;$('#tl').innerHTML=taskList()}});
-document.addEventListener('change',e=>{if(e.target.id==='fh'){S.fh=e.target.value;save()}else if(e.target.id==='ch'){csel=e.target.value;render()}});
+document.addEventListener('change',e=>{if(e.target.id==='fh'){S.fh=e.target.value;save()}else if(e.target.id==='ch'){csel=e.target.value;render()}else if(e.target.id==='td'){tday=e.target.value;render()}});
 document.addEventListener('submit',e=>{
   e.preventDefault();
   const f=e.target, k=f.dataset.f, v=Object.fromEntries(new FormData(f));
