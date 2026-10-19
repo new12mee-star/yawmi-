@@ -57,6 +57,7 @@ textarea{background:var(--panel);border:1px solid var(--line);border-radius:10px
 .ev[data-a]{cursor:pointer}
 .nl{position:absolute;left:0;right:0;height:2px;background:var(--hi);z-index:2}
 nav.tabs::-webkit-scrollbar{display:none}
+input[type=color]{padding:2px;width:46px;height:38px;cursor:pointer}
 .tm{font-size:.78rem;color:var(--mut);text-align:center;line-height:1.25;width:46px;flex:none}
 .cls{border-left:3px solid var(--acc)}
 .live{border-left-color:var(--ok)}
@@ -140,7 +141,7 @@ nav.tabs button.on{background:var(--panel2);color:var(--tx);font-weight:600}
   <button data-tab="tasks">Tasks</button>
   <button data-tab="habits">Habits</button>
   <button data-tab="week">Week</button>
-  <button data-tab="sched">Schedule</button>
+  <button data-tab="sched">Routine</button>
   <button data-tab="stats">Stats</button>
 </nav>
 
@@ -235,25 +236,28 @@ const editRow=t=>`<form class="edit" data-f="edit" data-id="${t.id}"><div class=
 <select name="cat" aria-label="Category">${opts(CATS,t.cat)}</select>
 <select name="rep" aria-label="Repeat">${repOpts(t.rep)}</select><textarea name="subs" rows="3" placeholder="Steps, one per line" aria-label="Steps">${esc((t.subs||[]).map(x=>x.t).join('\n'))}</textarea>
 <button class="pri">Save</button><button type="button" data-a="ec">Cancel</button></div></form>`;
+const KINDS=['Class','Work','Activity','Sport','Other'];
+const KC={Class:'#8fa3ff',Work:'#ffc977',Activity:'#7fd8b4',Sport:'#f6a05c',Other:'#b8bdd9'};
+const ink=c=>{const n=parseInt(c.slice(1),16);return ((n>>16)*299+(n>>8&255)*587+(n&255)*114)/1000>140?'#12162b':'#fff'};
 const DN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const dorder=()=>[0,1,2,3,4,5,6].map(i=>(S.wk+i)%7);
 const byStart=(a,b)=>a.start.localeCompare(b.start);
 const classesOn=d=>S.sched.filter(c=>c.day===new Date(d+'T12:00').getDay()).sort(byStart);
 const nowHM=()=>{const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')};
-const cEdit=c=>`<form class="edit" data-f="cedit" data-id="${c.id}"><div class="add"><input type="text" name="title" value="${esc(c.title)}" required maxlength="60" aria-label="Class"><select name="day" aria-label="Day">${dorder().map(g=>`<option value="${g}"${g===c.day?' selected':''}>${DN[g]}</option>`).join('')}</select><input type="time" name="start" value="${c.start}" required aria-label="Start time"><input type="time" name="end" value="${c.end}" required aria-label="End time"><input type="text" name="teacher" value="${esc(c.teacher||'')}" placeholder="Teacher" maxlength="40" aria-label="Teacher"><input type="text" name="room" value="${esc(c.room||'')}" placeholder="Room" maxlength="30" aria-label="Room"><button class="pri">Save</button><button type="button" data-a="ec">Cancel</button></div></form>`;
+const cEdit=c=>`<form class="edit" data-f="cedit" data-id="${c.id}"><div class="add"><input type="text" name="title" value="${esc(c.title)}" required maxlength="60" aria-label="Name"><select name="kind" aria-label="Type">${KINDS.map(k=>`<option${(c.kind||'Class')===k?' selected':''}>${k}</option>`).join('')}</select><input type="color" name="color" value="${c.color||KC[c.kind||'Class']}" aria-label="Color"><select name="day" aria-label="Day">${dorder().map(g=>`<option value="${g}"${g===c.day?' selected':''}>${DN[g]}</option>`).join('')}</select><input type="time" name="start" value="${c.start}" required aria-label="Start time"><input type="time" name="end" value="${c.end}" required aria-label="End time"><input type="text" name="teacher" value="${esc(c.teacher||'')}" placeholder="Details" maxlength="40" aria-label="Details"><input type="text" name="room" value="${esc(c.room||'')}" placeholder="Room" maxlength="30" aria-label="Room"><button class="pri">Save</button><button type="button" data-a="ec">Cancel</button></div></form>`;
 function classRow(c,d,del){
   if(del&&editId===c.id)return cEdit(c);
   const live=d===today()&&c.start<=nowHM()&&nowHM()<c.end;
   const rm=c.room&&/^\w{1,3}$/.test(c.room)?'Room '+c.room:c.room;
-  const meta=[c.teacher,rm,live?'now':''].filter(Boolean).join(' • ');
-  return `<div class="row cls${live?' live':''}"><div class="tm">${c.start}<br>${c.end}</div><div class="t">${esc(c.title)}<div class="meta">${esc(meta)}</div></div>${del?`<button class="x" data-a="ce" data-id="${c.id}">Edit</button><button class="x" data-a="cd" data-id="${c.id}" aria-label="Delete class">✕</button>`:''}</div>`;
+  const meta=[c.kind&&c.kind!=='Class'?c.kind:'',c.teacher,rm,live?'now':''].filter(Boolean).join(' • ');
+  return `<div class="row cls${live?' live':''}"${live?'':` style="border-left-color:${c.color||KC[c.kind||'Class']}"`}><div class="tm">${c.start}<br>${c.end}</div><div class="t">${esc(c.title)}<div class="meta">${esc(meta)}</div></div>${del?`<button class="x" data-a="ce" data-id="${c.id}">Edit</button><button class="x" data-a="cd" data-id="${c.id}" aria-label="Delete class">✕</button>`:''}</div>`;
 }
 function vSched(){
-  $('#title').textContent='Schedule';
-  const form=`<form class="add" data-f="cls"><input type="text" name="title" placeholder="Class / subject" required maxlength="60" aria-label="Class"><select name="day" aria-label="Day">${dorder().map(g=>`<option value="${g}">${DN[g]}</option>`).join('')}</select><input type="time" name="start" required aria-label="Start time"><input type="time" name="end" required aria-label="End time"><input type="text" name="teacher" placeholder="Teacher (optional)" maxlength="40" aria-label="Teacher"><input type="text" name="room" placeholder="Room (optional)" maxlength="30" aria-label="Room"><button class="pri">Add class</button></form>`;
+  $('#title').textContent='Weekly routine';
+  const form=`<form class="add" data-f="cls"><input type="text" name="title" placeholder="Name (class, work, gym…)" required maxlength="60" aria-label="Name"><select name="kind" aria-label="Type">${KINDS.map(k=>`<option>${k}</option>`).join('')}</select><input type="color" name="color" value="${KC.Class}" aria-label="Color"><div class="days" role="group" aria-label="Days">${dorder().map(g=>`<label class="d" style="width:30px" title="${DN[g]}"><input type="checkbox" name="dd" value="${g}" hidden${g===new Date().getDay()?' checked':''}>${DN[g].slice(0,2)}</label>`).join('')}</div><input type="time" name="start" required aria-label="Start time"><input type="time" name="end" required aria-label="End time"><input type="text" name="room" placeholder="Place (optional)" maxlength="30" aria-label="Place"><input type="text" name="teacher" placeholder="Details (optional)" maxlength="40" aria-label="Details"><button class="pri">Add to routine</button></form>`;
   const body=dorder().map(g=>{const l=S.sched.filter(c=>c.day===g).sort(byStart);
     return l.length?`<h2>${DN[g]}</h2>`+l.map(c=>classRow(c,'',true)).join(''):''}).join('');
-  return form+'<p class="meta">Weekly classes repeat automatically and appear in Today and Week.</p>'+(body||'<div class="empty">No classes yet. Add your timetable above.</div>');
+  return form+'<p class="meta">Fixed weekly items (classes, work hours, activities) repeat automatically and appear in Today, Week and Calendar. Pick several days to add the same time to all of them.</p>'+(body||'<div class="empty">Your routine is empty. Add classes, work hours or activities above.</div>');
 }
 function taskRow(t,showDate,mv){
   if(editId===t.id) return editRow(t);
@@ -315,7 +319,7 @@ function calHtml(){
 const toM=x=>+x.slice(0,2)*60+ +x.slice(3,5);
 const CC={Exam:'#ff8a9b',Health:'#7fd8b4',Study:'#7fc4ff',Money:'#ffc977',Work:'#c3a6ff',Home:'#f6a05c',Other:'#b8bdd9'};
 function dayEv(d){
-  const ev=classesOn(d).map(c=>({s:toM(c.start),e:toM(c.end),t:c.title,m:c.room||'',c:'#8fa3ff'}));
+  const ev=classesOn(d).map(c=>({s:toM(c.start),e:toM(c.end),t:c.title,m:c.room||'',c:c.color||KC[c.kind||'Class']}));
   S.tasks.filter(t=>t.date===d&&t.ts).forEach(t=>{const s=toM(t.ts);let e=t.te?toM(t.te):s+60;if(e<=s)e=s+60;ev.push({s,e,t:t.text,m:t.ts+(t.te?'–'+t.te:''),c:CC[t.cat]||CC.Other,id:t.id,done:t.done})});
   return ev;
 }
@@ -335,11 +339,11 @@ function vCal(){
   const head=days.map(d=>`<div class="ch${d===t0?' now':''}">${fmt(d,{weekday:wk?'short':'long'})}<b>${fmt(d,{day:'numeric'})}</b></div>`).join('');
   const allday=days.map(d=>`<div class="ca">${S.tasks.filter(t=>t.date===d&&!t.ts&&!t.done).map(t=>`<span>${esc(t.text)}</span>`).join('')}</div>`).join('');
   const nm=toM(nowHM());
-  const cols=days.map((d,i)=>`<div class="cc" style="height:${H}px;background-size:100% ${HP}px">${evs[i].map(x=>`<div class="ev${x.done?' dn':''}"${x.id?` data-a="tt" data-id="${x.id}"`:''} style="top:${(x.s-h0*60)/60*HP}px;height:${Math.max(18,(x.e-x.s)/60*HP-2)}px;left:${x.lane/x.n*100}%;width:calc(${100/x.n}% - 2px);background:${x.c}"><b>${esc(x.t)}</b>${wk?'':`<small>${esc(x.m)}</small>`}</div>`).join('')}${d===t0&&nm>=h0*60&&nm<h1*60?`<div class="nl" style="top:${(nm-h0*60)/60*HP}px"></div>`:''}</div>`).join('');
+  const cols=days.map((d,i)=>`<div class="cc" style="height:${H}px;background-size:100% ${HP}px">${evs[i].map(x=>`<div class="ev${x.done?' dn':''}"${x.id?` data-a="tt" data-id="${x.id}"`:''} style="top:${(x.s-h0*60)/60*HP}px;height:${Math.max(18,(x.e-x.s)/60*HP-2)}px;left:${x.lane/x.n*100}%;width:calc(${100/x.n}% - 2px);background:${x.c};color:${ink(x.c)}"><b>${esc(x.t)}</b>${wk?'':`<small>${esc(x.m)}</small>`}</div>`).join('')}${d===t0&&nm>=h0*60&&nm<h1*60?`<div class="nl" style="top:${(nm-h0*60)/60*HP}px"></div>`:''}</div>`).join('');
   const lab=wk?fmt(days[0],{month:'short',day:'numeric'})+' – '+fmt(days[6],{month:'short',day:'numeric'}):fmt(base,{weekday:'long',month:'long',day:'numeric'});
   return `<div class="nav"><button data-a="cnv" data-n="-1" aria-label="Previous">‹</button><span>${lab}</span><button data-a="cnv" data-n="1" aria-label="Next">›</button><button data-a="cto">Today</button><button class="chip${wk?'':' on'}" data-a="cvw" data-v="day">Day</button><button class="chip${wk?' on':''}" data-a="cvw" data-v="week">Week</button></div>
   <div class="cg" style="--n:${days.length}"><div></div>${head}<div class="ca0">no time</div>${allday}<div class="hr" style="height:${H}px">${hrs}</div>${cols}</div>
-  <p class="meta">Classes and tasks with a start time appear here. Tap a task block to mark it done. Add a time when creating or editing a task.</p>`;
+  <p class="meta">Routine items and tasks with a start time appear here. Tap a task block to mark it done. Add a time when creating or editing a task.</p>`;
 }
 function vStats(){
   $('#title').textContent='Stats';
@@ -384,7 +388,7 @@ function vToday(){
   return (now?banner():'')+dayNav(t0)+`<p class="sub">${total?`${done} of ${total} done`:'Nothing planned yet'}</p>
   <div class="big"><b>${pct}%</b><span class="meta">${dt}/${list.length} tasks • ${dh}/${hb.length} habits</span></div>
   <div class="bar"><i style="width:${pct}%"></i></div>
-  ${classesOn(t0).length?'<h2>'+(now?'Classes today':'Classes')+'</h2>'+classesOn(t0).map(c=>classRow(c,t0)).join(''):''}
+  ${classesOn(t0).length?'<h2>'+(now?'Routine today':'Routine')+'</h2>'+classesOn(t0).map(c=>classRow(c,t0)).join(''):''}
   ${examBlock(t0)}<h2>${now?'Tasks for today':'Tasks'}</h2>
   ${list.length?list.sort((a,b)=>a.done-b.done).map(t=>taskRow(t,false)).join(''):'<div class="empty">No tasks '+(now?'due today':'on this day')+'. Add one in Tasks or Week.</div>'}
   <h2>Habits</h2>
@@ -442,7 +446,7 @@ document.addEventListener('click',e=>{
   else if(a==='hh') hoff=Math.max(0,hoff+(+b.dataset.n));
   else if(a==='mv'&&t) t.date=addDays(today(),+b.dataset.n);
   else if(a==='dis') S.lx=Date.now();
-  else if(a==='cd'){const c=S.sched.find(x=>x.id===id);if(c){const i=S.sched.indexOf(c);S.sched.splice(i,1);note('Class deleted',{k:'sched',i,v:c})}}
+  else if(a==='cd'){const c=S.sched.find(x=>x.id===id);if(c){const i=S.sched.indexOf(c);S.sched.splice(i,1);note('Item deleted',{k:'sched',i,v:c})}}
   else if(a==='undo'&&lastDel){S[lastDel.k].splice(lastDel.i,0,lastDel.v);lastDel=null;hideToast()}
   else if(a==='ht'&&h){const d=b.dataset.d;
     if(h.goal){const v=prompt('Amount on '+fmt(d,{month:'short',day:'numeric'})+(h.unit?' ('+h.unit+')':'')+' – goal '+h.goal,h.log[d]||'');if(v!==null){const n=parseFloat(v);n>0?h.log[d]=n:delete h.log[d];if(isDone(h,d))ok('Goal reached')}}
@@ -467,7 +471,7 @@ document.addEventListener('click',e=>{
   save();render();
 });
 document.addEventListener('input',e=>{if(e.target.id==='q'){qs=e.target.value;$('#tl').innerHTML=taskList()}});
-document.addEventListener('change',e=>{if(e.target.id==='fh'){S.fh=e.target.value;save()}else if(e.target.id==='ch'){csel=e.target.value;render()}else if(e.target.id==='td'){tday=e.target.value;render()}});
+document.addEventListener('change',e=>{if(e.target.id==='fh'){S.fh=e.target.value;save()}else if(e.target.id==='ch'){csel=e.target.value;render()}else if(e.target.id==='td'){tday=e.target.value;render()}else if(e.target.name==='kind'&&e.target.form&&e.target.form.elements.color){e.target.form.elements.color.value=KC[e.target.value]||KC.Class}});
 document.addEventListener('submit',e=>{
   e.preventDefault();
   const f=e.target, k=f.dataset.f, v=Object.fromEntries(new FormData(f));
@@ -476,12 +480,13 @@ document.addEventListener('submit',e=>{
   if(k==='task'){qs='';if(cat!=='All'&&cat!==v.cat)cat='All'}
   if(k==='task') S.tasks.push({id:uid(),text:v.text.trim(),date:v.date||'',pri:v.pri,cat:v.cat,rep:v.rep||'',ts:v.ts||'',te:v.te||'',done:false});
   else if(k==='quick'){if(!v.text.trim()){ok('Type a task first',1);return} S.tasks.push({id:uid(),text:v.text.trim(),date:f.dataset.d,pri:'med',cat:'Other',done:false})}
-  else if(k==='cls') S.sched.push({id:uid(),title:v.title.trim(),day:+v.day,start:v.start,end:v.end,room:(v.room||'').trim(),teacher:(v.teacher||'').trim()});
-  else if(k==='cedit'){const c=S.sched.find(x=>x.id===f.dataset.id);if(c&&v.title.trim())Object.assign(c,{title:v.title.trim(),day:+v.day,start:v.start,end:v.end,room:(v.room||'').trim(),teacher:(v.teacher||'').trim()});editId=null}
+  else if(k==='cls'){const dd=new FormData(f).getAll('dd');if(!dd.length){ok('Pick at least one day',1);return}
+    dd.forEach(g=>S.sched.push({id:uid(),title:v.title.trim(),kind:v.kind||'Class',color:v.color||KC.Class,day:+g,start:v.start,end:v.end,room:(v.room||'').trim(),teacher:(v.teacher||'').trim()}))}
+  else if(k==='cedit'){const c=S.sched.find(x=>x.id===f.dataset.id);if(c&&v.title.trim())Object.assign(c,{title:v.title.trim(),kind:v.kind||'Class',color:v.color||KC.Class,day:+v.day,start:v.start,end:v.end,room:(v.room||'').trim(),teacher:(v.teacher||'').trim()});editId=null}
   else if(k==='edit'){const t=S.tasks.find(x=>x.id===f.dataset.id);if(t&&v.text.trim())Object.assign(t,{text:v.text.trim(),date:v.date||'',pri:v.pri,cat:v.cat,rep:v.rep||'',ts:v.ts||'',te:v.te||''});if(t){const o=t.subs||[];t.subs=(v.subs||'').split('\n').map(x=>x.trim()).filter(Boolean).map(x=>({t:x,d:o.some(q=>q.t===x&&q.d)}))}editId=null}
   else if(k==='hedit'){const h=S.habits.find(x=>x.id===f.dataset.id);if(h&&v.name.trim())Object.assign(h,{name:v.name.trim(),goal:+v.goal||0,unit:(v.unit||'').trim(),grp:(v.grp||'').trim()});editId=null}
   else if(k==='habit') S.habits.push({id:uid(),name:v.name.trim(),log:{},goal:+v.goal||0,unit:(v.unit||'').trim(),grp:(v.grp||'').trim(),freq:(()=>{const dd=new FormData(f).getAll('dd');return dd.length?'D:'+dd.join(','):v.freq||'daily'})()});
-  save();render();ok({task:'Task added',quick:'Task added',habit:'Habit added',cls:'Class added',edit:'Task saved',cedit:'Class saved'}[k]);
+  save();render();ok({task:'Task added',quick:'Task added',habit:'Habit added',cls:'Added to routine',edit:'Task saved',cedit:'Routine item saved'}[k]);
   const q=document.querySelector('form[data-f=task] input[name=text],form[data-f=habit] input[name=name],form[data-f=cls] input[name=title]'); if(q) q.focus();
 });
 $('#exp').onclick=()=>{S.lx=Date.now();save();render();
