@@ -19,7 +19,7 @@
 html,body{margin:0;background:var(--bg);color:var(--tx)}
 body{padding:env(safe-area-inset-top) 0 calc(76px + env(safe-area-inset-bottom));min-height:100vh;line-height:1.45}
 .wrap{max-width:760px;margin:0 auto;padding:18px 16px}
-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap}
 h1{font-size:1.5rem;margin:0;letter-spacing:.2px}
 h2{font-size:1.05rem;margin:22px 0 8px;color:var(--mut);font-weight:600}
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
@@ -128,7 +128,7 @@ nav.tabs button.on{background:var(--panel2);color:var(--tx);font-weight:600}
   <header>
     <div class="brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" class="logo" width="38" height="38" role="img" aria-label="Yawmi logo"><rect width="1024" height="1024" rx="220" fill="#05060a"/><g transform="translate(512 512) scale(.9) translate(-560 -530)" fill="none" stroke-width="84" stroke-linecap="round" stroke-linejoin="round"><path d="M790 520L500 800" stroke="#c8921c"/><path d="M500 520L790 800" stroke="#05060a" stroke-width="114"/><path d="M330 260V800" stroke="#f6c445"/><path d="M330 260H520A130 130 0 0 1 520 520H330" stroke="#f6c445"/><path d="M500 520L790 800" stroke="#f6c445"/></g></svg><h1 id="title">Today</h1></div>
     <div class="tools">
-      <button id="exp" title="Download a backup">Export</button>
+      <button id="syb" title="Sync across devices">☁ Sync</button><button id="exp" title="Download a backup">Export</button>
       <button id="imp" title="Load a backup">Import</button>
       <input id="file" type="file" hidden>
     </div>
@@ -155,7 +155,9 @@ S.born=S.born||Date.now();
 S.sched=S.sched||[];
 let tab='today', cat='All', off=0, editId=null, lastDel=null, tmr=null, hoff=0, qs='', cmo=0, csel='', fm={mins:25,end:0,left:1500}, cv=innerWidth>=700?'week':'day', cday='', tday='';
 const CATS=['Home','Health','Study','Money','Work','Exam','Other'];
-const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+let sb=null;try{sb=JSON.parse(localStorage.getItem('yawmi-sb'))}catch(e){}
+let syT=null,syncing=false,syMsg='',syErr='';
+const save=()=>{S.updated=Date.now();try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}schedSync()};
 if(!S.seeded){S.seeded=1;if(!S.sched.length)S.sched=[
 ['s1','Economie du Maroc','WASSINI ARRASEN',2,'08:30','10:45','4'],
 ['s2','Histoire de la pensée économique','DINAR',2,'11:00','13:15','1B'],
@@ -345,6 +347,80 @@ function vCal(){
   <div class="cg" style="--n:${days.length}"><div></div>${head}<div class="ca0">no time</div>${allday}<div class="hr" style="height:${H}px">${hrs}</div>${cols}</div>
   <p class="meta">Routine items and tasks with a start time appear here. Tap a task block to mark it done. Add a time when creating or editing a task.</p>`;
 }
+const saveSb=()=>{try{localStorage.setItem('yawmi-sb',JSON.stringify(sb))}catch(e){}};
+const persist=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+function setSt(m){syMsg=m;const b=$('#syb');if(b)b.textContent=sb&&sb.access?'☁ '+m:'☁ Sync';if(tab==='sync')render()}
+function schedSync(){if(sb&&sb.access){clearTimeout(syT);syT=setTimeout(sync,2000)}}
+async function refreshTok(){
+  try{const r=await fetch(sb.url+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:sb.key,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sb.refresh})});
+    if(!r.ok)return false;const j=await r.json();sb.access=j.access_token;sb.refresh=j.refresh_token;saveSb();return true}catch(e){return false}
+}
+async function sbFetch(path,opt){
+  opt=opt||{};
+  const go=()=>fetch(sb.url+path,{...opt,headers:{apikey:sb.key,Authorization:'Bearer '+sb.access,'Content-Type':'application/json',...(opt.headers||{})}});
+  let r=await go();
+  if(r.status===401&&sb.refresh&&await refreshTok())r=await go();
+  return r;
+}
+function mergeInto(a,b){
+  const mg=(x,y)=>{const ids=new Set(x.map(i=>i.id));(y||[]).forEach(i=>{if(!ids.has(i.id))x.push(i)})};
+  a.sched=a.sched||[];mg(a.tasks,b.tasks);mg(a.sched,b.sched);
+  (b.habits||[]).forEach(h=>{const e=a.habits.find(x=>x.id===h.id);if(e)e.log={...h.log,...e.log};else a.habits.push(h)});
+}
+async function sync(){
+  if(!sb||!sb.access||syncing)return;
+  if(navigator.onLine===false){setSt('Offline');return}
+  syncing=true;setSt('Syncing…');
+  try{
+    const r=await sbFetch('/rest/v1/yawmi_data?select=data&user_id=eq.'+sb.uid);
+    if(!r.ok)throw new Error('read '+r.status);
+    const rows=await r.json(),rem=rows[0]&&rows[0].data,dirty=(S.updated||0)>(sb.synced||0);
+    let push=false;
+    if(!rem)push=true;
+    else if((rem.updated||0)>(sb.synced||0)){
+      if(dirty){mergeInto(S,rem);S.updated=Date.now();push=true}
+      else{S=rem;S.sched=S.sched||[];persist();sb.synced=rem.updated;saveSb();if(!/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||''))render()}
+    }else if(dirty)push=true;
+    if(push){
+      const w=await sbFetch('/rest/v1/yawmi_data?on_conflict=user_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:sb.uid,data:S,updated_at:new Date().toISOString()})});
+      if(!w.ok)throw new Error('write '+w.status);
+      persist();sb.synced=S.updated;
+      if(!/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||''))render();
+    }
+    sb.last=Date.now();saveSb();syErr='';setSt('Synced ✓');
+  }catch(e){syErr=String(e&&e.message||e);setSt('Sync error')}
+  syncing=false;
+}
+async function sbAuth(up){
+  const g=i=>$('#'+i).value.trim(),url=g('sbu').replace(/\/+$/,''),key=g('sbk'),email=g('sbe'),pw=$('#sbp').value;
+  const set=m=>{const e=$('#sbm');if(e)e.textContent=m};
+  if(!/^https:\/\/.+/.test(url)||!key||!email||pw.length<6){set('⚠ Fill in all four fields (password: 6+ characters).');return}
+  set('Connecting…');
+  try{
+    const r=await fetch(url+(up?'/auth/v1/signup':'/auth/v1/token?grant_type=password'),{method:'POST',headers:{apikey:key,'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})});
+    const j=await r.json();
+    if(!r.ok){set('⚠ '+(j.msg||j.error_description||j.error||'Failed'));return}
+    if(!j.access_token){set('Account created. Open the confirmation email, then come back and press Sign in.');return}
+    sb={url,key,email,access:j.access_token,refresh:j.refresh_token,uid:j.user.id,synced:0};saveSb();
+    ok('Signed in');await sync();render();
+  }catch(e){set('⚠ Could not reach the server. Check the URL and your internet.')}
+}
+function vSync(){
+  $('#title').textContent='Sync';
+  if(sb&&sb.access)return `<p class="sub">Signed in as <b>${esc(sb.email)}</b></p>
+  <div class="row"><div class="t">${esc(syMsg||'Ready')}<div class="meta">${sb.last?'Last sync: '+new Date(sb.last).toLocaleString():'Not synced yet'}${syErr?' • '+esc(syErr):''}</div></div><button class="pri" id="sbsync">Sync now</button></div>
+  <p class="meta">Changes sync automatically a couple of seconds after you make them, and whenever you open the app. Without internet the app keeps working and syncs later.</p>
+  <button id="sbout">Sign out of this device</button>`;
+  return `<p class="meta">Keep the same data on your phone and computer. You need a free Supabase project. Your project key stays on this device only. Use the same four values on every device.</p>
+  <div class="add"><input type="url" id="sbu" placeholder="Project URL (https://xxxx.supabase.co)" aria-label="Project URL"><input type="text" id="sbk" placeholder="anon public key" aria-label="Anon key"><input type="email" id="sbe" placeholder="Email" aria-label="Email"><input type="password" id="sbp" placeholder="Password (6+ characters)" aria-label="Password">
+  <button class="pri" id="sbin">Sign in</button><button id="sbup">Create account</button></div><p class="meta" id="sbm"></p>`;
+}
+document.addEventListener('click',e=>{const i=e.target.id;
+  if(i==='syb'){tab='sync';render()}
+  else if(i==='sbin')sbAuth(false);else if(i==='sbup')sbAuth(true);
+  else if(i==='sbsync')sync();
+  else if(i==='sbout'){sb=null;try{localStorage.removeItem('yawmi-sb')}catch(x){}setSt('');render()}
+});
 function vStats(){
   $('#title').textContent='Stats';
   const t=today(),ds=[6,5,4,3,2,1,0].map(n=>addDays(t,-n));
@@ -427,7 +503,7 @@ function vWeek(){
   <div class="wk">${cols}</div>`;
 }
 function render(){
-  $('#view').innerHTML={cal:vCal,today:vToday,tasks:vTasks,habits:vHabits,week:vWeek,sched:vSched,stats:vStats}[tab]();
+  $('#view').innerHTML={sync:vSync,cal:vCal,today:vToday,tasks:vTasks,habits:vHabits,week:vWeek,sched:vSched,stats:vStats}[tab]();
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
   const ab=document.querySelector('#tabs .on');if(ab&&ab.scrollIntoView)ab.scrollIntoView({inline:'center',block:'nearest'});
   document.querySelectorAll('form').forEach(f=>f.noValidate=true);
@@ -510,6 +586,7 @@ $('#file').onchange=e=>{
   r.readAsText(f); e.target.value='';
 };
 render();
+window.addEventListener('online',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync()});setInterval(sync,60000);if(sb&&sb.access)sync();
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 </script>
